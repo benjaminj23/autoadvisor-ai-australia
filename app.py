@@ -18,7 +18,21 @@ st.set_page_config(page_title="AutoAdvisor AI MVP v20", page_icon="🚗", layout
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("data/cars_master_dataset.csv")
+    # Works both locally with /data folder and on GitHub if CSV is uploaded in root.
+    dataset_paths = [
+        "data/cars_master_dataset.csv",
+        "cars_master_dataset.csv",
+    ]
+
+    for path in dataset_paths:
+        try:
+            return pd.read_csv(path)
+        except FileNotFoundError:
+            continue
+
+    raise FileNotFoundError(
+        "Could not find cars_master_dataset.csv. Put it either in data/cars_master_dataset.csv or in the same folder as app.py."
+    )
 
 
 MODEL_LAUNCH_YEARS = {
