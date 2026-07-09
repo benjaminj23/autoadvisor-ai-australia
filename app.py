@@ -24,15 +24,37 @@ def load_data():
         "cars_master_dataset.csv",
     ]
 
+    loaded = None
+
     for path in dataset_paths:
         try:
-            return pd.read_csv(path)
+            loaded = pd.read_csv(path)
+            break
         except FileNotFoundError:
             continue
 
-    raise FileNotFoundError(
-        "Could not find cars_master_dataset.csv. Put it either in data/cars_master_dataset.csv or in the same folder as app.py."
-    )
+    if loaded is None:
+        raise FileNotFoundError(
+            "Could not find cars_master_dataset.csv. Put it either in data/cars_master_dataset.csv or in the same folder as app.py."
+        )
+
+    # Optional fields used by the UI. Add safe defaults if the deployed CSV does not have them.
+    optional_defaults = {
+        "market_segment": "General used car",
+        "buyer_fit": "",
+        "why_recommended": "",
+    }
+
+    for col, default in optional_defaults.items():
+        if col not in loaded.columns:
+            loaded[col] = default
+
+    if "buyer_fit" in loaded.columns and "why_recommended" in loaded.columns:
+        loaded["buyer_fit"] = loaded["buyer_fit"].fillna(loaded["why_recommended"]).fillna("Good fit for selected needs")
+    elif "buyer_fit" in loaded.columns:
+        loaded["buyer_fit"] = loaded["buyer_fit"].fillna("Good fit for selected needs")
+
+    return loaded
 
 
 MODEL_LAUNCH_YEARS = {
@@ -2885,7 +2907,11 @@ with tab1:
         "why_recommended",
     ]
 
-    show = top[display_cols].copy()
+    # Keep only columns that actually exist in the deployed CSV.
+    # This prevents Streamlit Cloud from crashing if the dataset is missing optional columns.
+    existing_display_cols = [col for col in display_cols if col in top.columns]
+    show = top[existing_display_cols].copy()
+
     if "display_year_range" in top.columns and "year_range" in show.columns:
         show["year_range"] = top["display_year_range"].values
 
@@ -2971,11 +2997,12 @@ with tab1:
         "resale_score",
     ]
 
-    breakdown = top.head(5)[breakdown_cols].copy()
+    existing_breakdown_cols = [col for col in breakdown_cols if col in top.columns]
+    breakdown = top.head(5)[existing_breakdown_cols].copy()
     if "display_year_range" in top.columns and "year_range" in breakdown.columns:
         breakdown["year_range"] = top.head(5)["display_year_range"].values
 
-    for col in breakdown_cols[3:]:
+    for col in existing_breakdown_cols[3:]:
         breakdown[col] = breakdown[col].round(1)
 
     st.dataframe(breakdown, use_container_width=True, hide_index=True)
