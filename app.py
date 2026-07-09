@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v30", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v31", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -891,14 +891,11 @@ def build_listing_links(make, model, year_range=None, max_price=None, state=None
     # Keep Gumtree broad, then the user can filter price/location on Gumtree.
     gumtree_url = f"https://www.gumtree.com.au/s-cars-vans-utes/k0c18320?keywords={encoded_broad_query}"
 
-    # Facebook Marketplace is inconsistent with external search URLs.
-    # Add the selected city into the query so it at least nudges results toward the right market.
-    facebook_query = broad_query
-    if city:
-        facebook_query += f" {city}"
-    elif state:
-        facebook_query += f" {state}"
-    facebook_url = f"https://www.facebook.com/marketplace/search/?query={quote_plus(facebook_query)}"
+    # Facebook Marketplace is heavily tied to the user's account/browser location.
+    # Use the city-scoped Marketplace URL pattern first, then keep the query clean.
+    # The user may still need to change Marketplace location manually if Facebook overrides it.
+    facebook_location_slug = city_to_slug(city or state_to_default_city(state))
+    facebook_url = f"https://www.facebook.com/marketplace/{facebook_location_slug}/search/?query={encoded_broad_query}"
 
     # Cars24 does not reliably accept portable search query URLs.
     # Direct make/model/city pages are cleaner than dumping users into Google results.
@@ -927,7 +924,7 @@ def render_listing_search_buttons(make, model, year_range=None, max_price=None, 
     safe_key = re.sub(r"[^A-Za-z0-9_]+", "_", str(key_suffix))
 
     if years:
-        st.caption("Choose one or more years to search. Facebook and Gumtree may still use your account/browser location, so adjust location filters after opening if needed.")
+        st.caption("Choose one or more years to search. Facebook opens a city-scoped Marketplace URL, but it may still override location based on your account/browser settings.")
 
         all_years = st.checkbox(
             "All years in this range",
