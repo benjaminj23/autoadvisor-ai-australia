@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v23", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v24", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -382,6 +382,56 @@ def detect_listing_platform(url):
     return "Other listing site"
 
 
+
+def extract_listing_text_from_url(url):
+    """Fallback when a marketplace blocks page scraping.
+
+    This reads useful terms from the URL itself, especially Carsales URLs like:
+    /cars/details/2020-toyota-corolla-fielder-hybrid-ex-auto/...
+    """
+    raw_url = str(url).strip()
+    url_lower = raw_url.lower()
+    platform = detect_listing_platform(raw_url)
+
+    # Remove protocol/domain/query, then split slug text.
+    cleaned_url = re.sub(r"^https?://", "", raw_url, flags=re.I)
+    cleaned_url = cleaned_url.split("?", 1)[0]
+    cleaned_url = cleaned_url.replace("/", " ")
+
+    # Carsales details URLs often contain the useful listing title after /details/.
+    cleaned_url = re.sub(r".*cars/details/", "", cleaned_url, flags=re.I)
+
+    slug_text = re.sub(r"[^A-Za-z0-9]+", " ", cleaned_url)
+    slug_text = re.sub(r"\s+", " ", slug_text).strip()
+
+    # Drop common marketplace noise.
+    noise_words = [
+        "www", "com", "au", "carsales", "cars24", "gumtree",
+        "details", "cars", "buy", "used", "car", "sale",
+        "oag", "ad", "gts", "saleld", "viewtype", "showcase", "rankingtype",
+    ]
+
+    words = [word for word in slug_text.split() if word.lower() not in noise_words]
+    readable = " ".join(words).strip()
+
+    title = readable.title() if readable else f"{platform} listing"
+
+    return {
+        "ok": True,
+        "platform": platform,
+        "title": title,
+        "description": (
+            "The site blocked automatic page reading, so AutoAdvisor extracted what it could from the URL. "
+            "Please enter price, kilometres and missing details manually."
+        ),
+        "image": "",
+        "combined_text": readable,
+        "error": "",
+        "fallback_from_url": True,
+    }
+
+
+
 def fetch_listing_page_text(url):
     url = str(url).strip()
 
@@ -414,15 +464,14 @@ def fetch_listing_page_text(url):
         response.raise_for_status()
         html = response.text
     except Exception as exc:
-        return {
-            "ok": False,
-            "platform": platform,
-            "title": "",
-            "description": "",
-            "image": "",
-            "combined_text": "",
-            "error": f"Could not read the listing page automatically: {exc}",
-        }
+        # Carsales and some marketplaces often return 403/blocked responses.
+        # Instead of failing completely, extract make/model/year hints from the URL slug.
+        fallback = extract_listing_text_from_url(url)
+        fallback["description"] = (
+            f"Could not read the listing page automatically ({exc}). "
+            "Using details found in the URL only. Please enter price, kilometres and missing details manually."
+        )
+        return fallback
 
     def meta_content(patterns):
         for pattern in patterns:
@@ -3258,6 +3307,12 @@ with tab2:
                     extracted = extract_listing_details(import_result.get("combined_text", ""), df)
                     extracted_messages = apply_extracted_listing_to_session(extracted, df)
 
+                    if import_result.get("fallback_from_url"):
+                        st.warning(
+                            "Carsales blocked automatic page reading, so I extracted only what I could from the URL. "
+                            "Enter the actual price, kilometres and service details manually before analysing."
+                        )
+
                     if extracted_messages:
                         st.success("Imported: " + ", ".join(extracted_messages))
                         if extracted.get("price") is None:
@@ -3266,7 +3321,7 @@ with tab2:
                             st.info("Accident/write-off status was not clearly found. It stays as Unknown until the seller/PPSR confirms it.")
                         st.info("The fields below have been updated. Review them before analysing.")
                     else:
-                        st.warning("The page was readable, but I could not confidently extract car details. Copy the listing description and use Paste listing text.")
+                        st.warning("I could not confidently extract car details. Copy the listing title/description and use Paste listing text.")
                 else:
                     st.warning(import_result.get("error", "Could not import listing details."))
                     st.info("Fallback: copy the listing title/description and use Paste listing text.")
