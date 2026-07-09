@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v21", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v23", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -296,11 +296,37 @@ def extract_service_history(text):
 def extract_accident_status(text):
     cleaned = clean_text_for_matching(text)
 
-    if any(term in cleaned for term in ["write off", "written off", "repairable writeoff", "repairable write off", "accident history"]):
-        return "Known accident/write-off concern"
-
-    if any(term in cleaned for term in ["no accident", "never accident", "no write off", "not written off", "clean title"]):
+    # Clear negative phrases first.
+    if any(
+        term in cleaned
+        for term in [
+            "no accident",
+            "never accident",
+            "no write off",
+            "not written off",
+            "not write off",
+            "clean title",
+            "clear title",
+            "ppsr clear",
+        ]
+    ):
         return "No concern reported"
+
+    # Only flag as known concern when the wording is specific.
+    # Generic marketplace labels like "accident history" appear on many pages and should not trigger this.
+    high_risk_patterns = [
+        r"\bwritten\s+off\b",
+        r"\bwrite\s*off\b",
+        r"\brepairable\s+write\s*off\b",
+        r"\bstatu?tory\s+write\s*off\b",
+        r"\baccident\s+damage\b",
+        r"\bmajor\s+accident\b",
+        r"\bhas\s+been\s+in\s+an\s+accident\b",
+        r"\baccident\s+history\s*[:\-]\s*(yes|recorded|found)\b",
+    ]
+
+    if any(re.search(pattern, cleaned, flags=re.IGNORECASE) for pattern in high_risk_patterns):
+        return "Known accident/write-off concern"
 
     return None
 
@@ -475,6 +501,9 @@ def apply_extracted_listing_to_session(extracted, base_df):
     if extracted["price"] is not None:
         st.session_state["listing_price"] = extracted["price"]
         extracted_messages.append(f"Price: {money(extracted['price'])}")
+    else:
+        # Avoid leaving stale/default $1,000 in the price field after link import.
+        st.session_state.pop("listing_price", None)
 
     if extracted["kilometres"] is not None:
         st.session_state["listing_kms"] = extracted["kilometres"]
@@ -484,9 +513,12 @@ def apply_extracted_listing_to_session(extracted, base_df):
         st.session_state["listing_service"] = extracted["service_history"]
         extracted_messages.append(f"Service history: {extracted['service_history']}")
 
-    if extracted["accident_status"] != "Unknown":
+    if extracted["accident_status"] not in [None, "Unknown"]:
         st.session_state["listing_accident"] = extracted["accident_status"]
         extracted_messages.append(f"Accident/write-off: {extracted['accident_status']}")
+    else:
+        # Unknown is safer than wrongly claiming known accident/write-off concern.
+        st.session_state["listing_accident"] = "Unknown"
 
     return extracted_messages
 
@@ -498,14 +530,25 @@ def render_imported_listing_preview(import_result, url):
     image = import_result.get("image")
 
     if image:
-        st.image(image, use_container_width=True)
+        img_col, text_col = st.columns([1, 2.4])
 
-    st.info(f"Imported from {platform}: {title[:140]}")
-    if description:
-        st.caption(description[:350])
+        with img_col:
+            st.image(image, use_container_width=True)
 
-    if url:
-        st.link_button("Open original listing", url, use_container_width=True)
+        with text_col:
+            st.info(f"Imported from {platform}: {title[:140]}")
+            if description:
+                st.caption(description[:350])
+
+            if url:
+                st.link_button("Open original listing", url, use_container_width=True)
+    else:
+        st.info(f"Imported from {platform}: {title[:140]}")
+        if description:
+            st.caption(description[:350])
+
+        if url:
+            st.link_button("Open original listing", url, use_container_width=True)
 
 
 
@@ -3217,6 +3260,10 @@ with tab2:
 
                     if extracted_messages:
                         st.success("Imported: " + ", ".join(extracted_messages))
+                        if extracted.get("price") is None:
+                            st.warning("Price was not clearly found from the link, so the app will use the dataset estimate/default. Please enter the actual asking price manually.")
+                        if extracted.get("accident_status") in [None, "Unknown"]:
+                            st.info("Accident/write-off status was not clearly found. It stays as Unknown until the seller/PPSR confirms it.")
                         st.info("The fields below have been updated. Review them before analysing.")
                     else:
                         st.warning("The page was readable, but I could not confidently extract car details. Copy the listing description and use Paste listing text.")
