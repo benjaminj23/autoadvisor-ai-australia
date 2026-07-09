@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v29", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v30", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -891,8 +891,14 @@ def build_listing_links(make, model, year_range=None, max_price=None, state=None
     # Keep Gumtree broad, then the user can filter price/location on Gumtree.
     gumtree_url = f"https://www.gumtree.com.au/s-cars-vans-utes/k0c18320?keywords={encoded_broad_query}"
 
-    # Facebook Marketplace also behaves better with simple make/model/year terms.
-    facebook_url = f"https://www.facebook.com/marketplace/search/?query={encoded_broad_query}"
+    # Facebook Marketplace is inconsistent with external search URLs.
+    # Add the selected city into the query so it at least nudges results toward the right market.
+    facebook_query = broad_query
+    if city:
+        facebook_query += f" {city}"
+    elif state:
+        facebook_query += f" {state}"
+    facebook_url = f"https://www.facebook.com/marketplace/search/?query={quote_plus(facebook_query)}"
 
     # Cars24 does not reliably accept portable search query URLs.
     # Direct make/model/city pages are cleaner than dumping users into Google results.
@@ -921,7 +927,7 @@ def render_listing_search_buttons(make, model, year_range=None, max_price=None, 
     safe_key = re.sub(r"[^A-Za-z0-9_]+", "_", str(key_suffix))
 
     if years:
-        st.caption("Choose one or more years to search. Marketplace buttons use broad searches first; apply price/location filters on the site if needed.")
+        st.caption("Choose one or more years to search. Facebook and Gumtree may still use your account/browser location, so adjust location filters after opening if needed.")
 
         all_years = st.checkbox(
             "All years in this range",
