@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v20", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v21", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -335,6 +335,178 @@ def extract_make_model(text, base_df):
             return make, None
 
     return None, None
+
+
+def detect_listing_platform(url):
+    url_lower = str(url).lower()
+
+    if "carsales.com.au" in url_lower:
+        return "Carsales"
+    if "gumtree.com.au" in url_lower:
+        return "Gumtree"
+    if "facebook.com/marketplace" in url_lower:
+        return "Facebook Marketplace"
+    if "cars24.com.au" in url_lower:
+        return "Cars24"
+    if "drive.com.au" in url_lower:
+        return "Drive"
+    if "carsguide.com.au" in url_lower:
+        return "CarsGuide"
+
+    return "Other listing site"
+
+
+def fetch_listing_page_text(url):
+    url = str(url).strip()
+
+    if not url:
+        return {
+            "ok": False,
+            "platform": None,
+            "title": "",
+            "description": "",
+            "image": "",
+            "combined_text": "",
+            "error": "No URL provided.",
+        }
+
+    if not re.match(r"^https?://", url, flags=re.I):
+        url = "https://" + url
+
+    platform = detect_listing_platform(url)
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0 Safari/537.36"
+        )
+    }
+
+    try:
+        response = requests.get(url, headers=headers, timeout=8)
+        response.raise_for_status()
+        html = response.text
+    except Exception as exc:
+        return {
+            "ok": False,
+            "platform": platform,
+            "title": "",
+            "description": "",
+            "image": "",
+            "combined_text": "",
+            "error": f"Could not read the listing page automatically: {exc}",
+        }
+
+    def meta_content(patterns):
+        for pattern in patterns:
+            match = re.search(pattern, html, flags=re.I | re.S)
+            if match:
+                return re.sub(r"\s+", " ", match.group(1)).strip()
+        return ""
+
+    title = meta_content([
+        r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:title["\']',
+        r"<title[^>]*>(.*?)</title>",
+    ])
+
+    description = meta_content([
+        r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']description["\']',
+    ])
+
+    image = meta_content([
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    ])
+
+    cleaned = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.I | re.S)
+    cleaned = re.sub(r"<style[^>]*>.*?</style>", " ", cleaned, flags=re.I | re.S)
+    visible_text = re.sub(r"<[^>]+>", " ", cleaned)
+    visible_text = re.sub(r"\s+", " ", visible_text).strip()
+
+    combined = " ".join([title, description, visible_text[:5000]])
+
+    return {
+        "ok": True,
+        "platform": platform,
+        "title": title,
+        "description": description,
+        "image": image,
+        "combined_text": combined,
+        "error": "",
+    }
+
+
+def apply_extracted_listing_to_session(extracted, base_df):
+    extracted_messages = []
+
+    if extracted["make"] in base_df["make"].unique():
+        st.session_state["listing_make"] = extracted["make"]
+        extracted_messages.append(f"Make: {extracted['make']}")
+
+    if extracted["make"] and extracted["model"]:
+        valid_models = base_df[base_df["make"] == extracted["make"]]["model"].unique()
+
+        if extracted["model"] in valid_models:
+            st.session_state["listing_model"] = extracted["model"]
+            extracted_messages.append(f"Model: {extracted['model']}")
+    elif extracted["make"] and not extracted["model"]:
+        st.session_state["listing_model"] = "Select model"
+        extracted_messages.append("Model not detected - please select it manually")
+
+    if extracted["year_range"]:
+        st.session_state["detected_year_range"] = extracted["year_range"]
+
+    if extracted["make"] and extracted["model"] and extracted["year_range"]:
+        valid_ranges = base_df[
+            (base_df["make"] == extracted["make"])
+            & (base_df["model"] == extracted["model"])
+        ]["year_range"].unique()
+
+        if extracted["year_range"] in valid_ranges:
+            st.session_state["listing_year"] = extracted["year_range"]
+            extracted_messages.append(f"Year: {extracted['year']} → {extracted['year_range']}")
+    elif extracted["year"] and extracted["year_range"]:
+        extracted_messages.append(f"Year detected: {extracted['year']} → {extracted['year_range']}")
+
+    if extracted["price"] is not None:
+        st.session_state["listing_price"] = extracted["price"]
+        extracted_messages.append(f"Price: {money(extracted['price'])}")
+
+    if extracted["kilometres"] is not None:
+        st.session_state["listing_kms"] = extracted["kilometres"]
+        extracted_messages.append(f"Kilometres: {extracted['kilometres']:,} km")
+
+    if extracted["service_history"] != "Unknown":
+        st.session_state["listing_service"] = extracted["service_history"]
+        extracted_messages.append(f"Service history: {extracted['service_history']}")
+
+    if extracted["accident_status"] != "Unknown":
+        st.session_state["listing_accident"] = extracted["accident_status"]
+        extracted_messages.append(f"Accident/write-off: {extracted['accident_status']}")
+
+    return extracted_messages
+
+
+def render_imported_listing_preview(import_result, url):
+    platform = import_result.get("platform") or "Listing site"
+    title = import_result.get("title") or "Listing preview"
+    description = import_result.get("description") or "Details found from the link will be used to pre-fill the analyser where possible."
+    image = import_result.get("image")
+
+    if image:
+        st.image(image, use_container_width=True)
+
+    st.info(f"Imported from {platform}: {title[:140]}")
+    if description:
+        st.caption(description[:350])
+
+    if url:
+        st.link_button("Open original listing", url, use_container_width=True)
+
 
 
 def extract_listing_details(raw_text, base_df):
@@ -3011,11 +3183,56 @@ with tab1:
 with tab2:
     st.subheader("Listing analyser")
     st.write(
-        "Paste the important details from a listing, or enter them manually. "
-        "This is not live scraping yet. We’re doing the responsible thing first, annoying as that is."
+        "Paste a listing link, paste listing text, or enter details manually. "
+        "The link import is best-effort because marketplaces block things whenever they feel emotionally threatened."
     )
 
-    with st.expander("Paste raw listing text and auto-fill fields", expanded=True):
+    import_mode = st.radio(
+        "How do you want to add the listing?",
+        ["Paste listing link", "Paste listing text", "Enter manually"],
+        horizontal=True,
+        key="listing_import_mode",
+    )
+
+    if import_mode == "Paste listing link":
+        st.markdown("### Paste listing link")
+        listing_url_input = st.text_input(
+            "Listing URL",
+            value=st.session_state.get("listing_original_url", ""),
+            placeholder="Paste Carsales, Gumtree, Cars24, Facebook, or dealer listing link",
+            key="listing_link_import_url",
+        )
+
+        if st.button("Import details from link", key="import_listing_link"):
+            if listing_url_input.strip():
+                with st.spinner("Reading listing page and trying not to get blocked by the internet..."):
+                    import_result = fetch_listing_page_text(listing_url_input)
+                    st.session_state["listing_original_url"] = listing_url_input
+                    st.session_state["last_listing_import"] = import_result
+
+                if import_result.get("ok"):
+                    render_imported_listing_preview(import_result, listing_url_input)
+                    extracted = extract_listing_details(import_result.get("combined_text", ""), df)
+                    extracted_messages = apply_extracted_listing_to_session(extracted, df)
+
+                    if extracted_messages:
+                        st.success("Imported: " + ", ".join(extracted_messages))
+                        st.info("The fields below have been updated. Review them before analysing.")
+                    else:
+                        st.warning("The page was readable, but I could not confidently extract car details. Copy the listing description and use Paste listing text.")
+                else:
+                    st.warning(import_result.get("error", "Could not import listing details."))
+                    st.info("Fallback: copy the listing title/description and use Paste listing text.")
+            else:
+                st.warning("Paste a listing URL first, revolutionary concept.")
+
+        if st.session_state.get("last_listing_import") and st.session_state.get("listing_original_url"):
+            render_imported_listing_preview(
+                st.session_state["last_listing_import"],
+                st.session_state["listing_original_url"],
+            )
+
+    with st.expander("Paste raw listing text and auto-fill fields", expanded=(import_mode == "Paste listing text")):
         raw_listing_text = st.text_area(
             "Raw listing text",
             height=140,
@@ -3214,10 +3431,13 @@ with tab2:
 
         listing_url = st.text_input(
             "Original listing URL",
-            value=st.session_state.get("listing_original_url", ""),
-            key="listing_original_url",
+            value=st.session_state.get("listing_original_url", st.session_state.get("listing_link_import_url", "")),
+            key="listing_original_url_manual",
             placeholder="Optional - paste Carsales/Gumtree/Cars24/Facebook link",
         )
+
+        if listing_url:
+            st.session_state["listing_original_url"] = listing_url
 
     with l3:
         seller_options = ["Private", "Dealer"]
