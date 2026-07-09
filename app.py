@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v28", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v29", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -894,21 +894,16 @@ def build_listing_links(make, model, year_range=None, max_price=None, state=None
     # Facebook Marketplace also behaves better with simple make/model/year terms.
     facebook_url = f"https://www.facebook.com/marketplace/search/?query={encoded_broad_query}"
 
-    # Cars24's internal search query URLs are unreliable. Use Google site-search instead.
-    # Include city and price here because Google handles natural language search better than marketplace keyword boxes.
-    google_terms = broad_query
-    if city:
-        google_terms += f" {city}"
-    if max_price:
-        google_terms += f" under {int(max_price)}"
-    cars24_google_query = quote_plus(f"site:cars24.com.au/buy-used-cars {google_terms}")
-    cars24_url = f"https://www.google.com/search?q={cars24_google_query}"
+    # Cars24 does not reliably accept portable search query URLs.
+    # Direct make/model/city pages are cleaner than dumping users into Google results.
+    # Year and price filters still need to be adjusted manually on Cars24.
+    cars24_url = f"https://www.cars24.com.au/buy-used-{make_slug}-{model_slug}-cars-in-{city_slug}/"
 
     return {
         "Carsales": carsales_url,
         "Gumtree broad search": gumtree_url,
         "Facebook Marketplace": facebook_url,
-        "Cars24 via Google": cars24_url,
+        "Cars24 model page": cars24_url,
     }
 
 
@@ -3322,7 +3317,7 @@ with tab1:
         key_suffix="best_match",
     )
     st.caption(
-        "Choose one or more years, then open the marketplace links. Carsales uses year/make/model URLs. Gumtree and Facebook use broad make/model/year searches so they do not return zero results from over-specific keywords. Apply price/location filters on the marketplace page. Cars24 opens through Google site-search because Cars24's own search URL is unreliable."
+        "Choose one or more years, then open the marketplace links. Carsales uses year/make/model URLs. Gumtree and Facebook use broad make/model/year searches so they do not return zero results from over-specific keywords. Cars24 opens a direct make/model/city page where possible; apply year and price filters on Cars24 manually."
     )
 
     with st.expander("Search links for top 5 recommendations"):
