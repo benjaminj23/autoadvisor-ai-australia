@@ -1,9 +1,36 @@
-[theme]
-base = "dark"
-primaryColor = "#38BDF8"
-backgroundColor = "#050816"
-secondaryBackgroundColor = "#0F172A"
-textColor = "#EEF2FF"
-
-[server]
-headless = true
+make,model,year_range,avg_used_price_aud,fuel_type,fuel_economy_l_per_100km,maintenance_score,annual_maintenance_aud,space_score,seats,body_type,reliability_score,safety_score,comfort_score,technology_score,performance_score,resale_score,why_recommended,buyer_fit
+Toyota,Yaris,2012-2015,10500,Petrol,6.3,9,850,5,5,Hatch,9,7,6,5,5,8,"Cheap, reliable first car with low running costs.","Cheap, reliable first car with low running costs."
+Toyota,Yaris,2016-2019,16500,Petrol,6.4,9,900,5,5,Hatch,9,8,6,6,5,8,Reliable city car with strong resale.,Reliable city car with strong resale.
+Toyota,Corolla,2012-2015,13500,Petrol,7.0,9,900,6,5,Sedan/Hatch,9,7,7,5,5,9,Safe default choice for reliability and resale.,Safe default choice for reliability and resale.
+Toyota,Corolla,2016-2019,21000,Petrol,6.8,9,950,6,5,Sedan/Hatch,9,8,7,7,5,9,Balanced ownership cost and reliability.,Balanced ownership cost and reliability.
+Toyota,Corolla Hybrid,2020-2024,31000,Hybrid,4.2,9,1000,6,5,Sedan/Hatch,9,9,8,8,5,9,Excellent fuel efficiency and low running cost.,Excellent fuel efficiency and low running cost.
+Toyota,Camry,2016-2019,23500,Petrol,8.1,8,1050,7,5,Sedan,9,8,8,7,6,8,Comfortable sedan with strong reliability.,Comfortable sedan with strong reliability.
+Toyota,RAV4,2016-2019,28500,Petrol,7.3,8,1100,8,5,SUV,9,8,8,7,6,9,Practical SUV with excellent resale.,Practical SUV with excellent resale.
+Toyota,RAV4,2020-2024,43000,Hybrid,4.8,8,1150,8,5,SUV,9,9,8,9,6,9,Efficient family SUV with strong demand.,Efficient family SUV with strong demand.
+Toyota,Kluger,2016-2019,36000,Petrol,10.2,7,1300,9,7,7-seat SUV,8,8,8,7,6,8,Large family SUV with seven seats.,Large family SUV with seven seats.
+Mazda,Mazda3,2012-2015,14500,Petrol,6.6,8,950,6,5,Sedan/Hatch,8,7,8,6,6,8,Good-looking and fun compact car.,Good-looking and fun compact car.
+Mazda,Mazda3,2016-2019,22000,Petrol,6.5,8,1000,6,5,Sedan/Hatch,8,8,8,7,6,8,Premium-feeling compact with good reliability.,Premium-feeling compact with good reliability.
+Mazda,CX-5,2016-2019,27000,Petrol,7.4,8,1100,8,5,SUV,8,8,8,7,6,8,Well-rounded SUV with good comfort.,Well-rounded SUV with good comfort.
+Mazda,CX-30,2020-2024,33000,Petrol,6.5,8,1100,7,5,SUV,8,9,8,9,6,8,Modern compact SUV with premium feel.,Modern compact SUV with premium feel.
+Hyundai,i30,2016-2019,17500,Petrol,7.1,8,950,6,5,Hatch,8,8,7,7,5,7,Good value hatch with low ownership stress.,Good value hatch with low ownership stress.
+Hyundai,Tucson,2016-2019,23500,Petrol,7.9,8,1050,8,5,SUV,8,8,8,7,5,7,Value-friendly family SUV.,Value-friendly family SUV.
+Hyundai,Kona,2020-2024,28500,Petrol,6.4,8,1000,6,5,SUV,8,9,7,8,5,7,Compact SUV suited to city driving.,Compact SUV suited to city driving.
+Kia,Rio,2016-2019,15500,Petrol,6.2,8,900,5,5,Hatch,8,8,6,6,5,7,Affordable first car with decent safety.,Affordable first car with decent safety.
+Kia,Cerato,2016-2019,18500,Petrol,7.4,8,950,6,5,Sedan/Hatch,8,8,7,7,5,7,Good-value compact with warranty appeal.,Good-value compact with warranty appeal.
+Kia,Sportage,2016-2019,24500,Petrol,7.9,8,1050,8,5,SUV,8,8,8,7,5,7,Affordable family SUV.,Affordable family SUV.
+Kia,Carnival,2016-2019,33000,Diesel,7.6,7,1300,10,8,People mover,8,8,8,7,5,7,Excellent people mover for large families.,Excellent people mover for large families.
+Honda,Civic,2016-2019,21000,Petrol,6.4,8,950,6,5,Sedan/Hatch,8,8,8,7,6,8,Reliable compact with good driving feel.,Reliable compact with good driving feel.
+Honda,CR-V,2016-2019,26000,Petrol,7.3,8,1050,8,5,SUV,8,8,8,7,5,8,Practical SUV with strong reliability.,Practical SUV with strong reliability.
+Subaru,Forester,2016-2019,26500,Petrol,8.1,7,1150,8,5,SUV,8,8,8,7,6,7,AWD SUV with practicality.,AWD SUV with practicality.
+Suzuki,Swift,2016-2019,15500,Petrol,5.5,9,850,5,5,Hatch,8,7,6,6,5,7,Cheap and efficient city car.,Cheap and efficient city car.
+Nissan,X-Trail,2016-2019,23500,Petrol,8.1,7,1050,8,5,SUV,7,8,7,7,5,7,Practical SUV with family space.,Practical SUV with family space.
+Mitsubishi,Outlander,2016-2019,24500,Petrol,7.2,8,1050,8,7,7-seat SUV,8,8,7,7,5,7,Affordable seven-seat SUV.,Affordable seven-seat SUV.
+Mitsubishi,ASX,2016-2019,19000,Petrol,7.6,8,950,7,5,SUV,8,7,7,6,5,7,Budget SUV option.,Budget SUV option.
+Ford,Ranger,2016-2019,38000,Diesel,8.9,7,1400,7,5,Ute,7,8,7,7,7,8,Popular ute with strong resale.,Popular ute with strong resale.
+Volkswagen,Golf,2016-2019,21000,Petrol,6.2,6,1250,6,5,Hatch,7,8,8,8,7,7,Refined hatch but check maintenance history.,Refined hatch but check maintenance history.
+Audi,A4,2016-2019,30000,Petrol,6.6,5,1700,7,5,Sedan,6,8,9,8,7,6,Premium sedan with higher maintenance risk.,Premium sedan with higher maintenance risk.
+BMW,3 Series,2016-2019,32000,Petrol,6.8,5,1800,7,5,Sedan,6,8,9,8,8,6,"Premium driving feel, higher repair costs.","Premium driving feel, higher repair costs."
+Volvo,XC40,2020-2024,43000,Petrol,7.2,6,1500,7,5,SUV,7,9,9,9,6,7,Safe premium compact SUV.,Safe premium compact SUV.
+MG,ZS EV,2020-2024,30000,Electric,0.0,7,900,7,5,SUV,7,8,7,8,5,6,Affordable EV SUV option.,Affordable EV SUV option.
+BYD,Atto 3,2020-2024,38000,Electric,0.0,7,900,7,5,SUV,7,9,8,9,6,7,Popular affordable electric SUV.,Popular affordable electric SUV.
+Tesla,Model 3,2020-2024,48000,Electric,0.0,6,1000,7,5,Sedan,7,9,8,10,8,7,Tech-heavy EV sedan.,Tech-heavy EV sedan.
