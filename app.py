@@ -13,7 +13,7 @@ except ImportError:  # Streamlit usually includes requests, but deployments enjo
     requests = None
 
 
-st.set_page_config(page_title="AutoAdvisor AI MVP v24", page_icon="🚗", layout="wide")
+st.set_page_config(page_title="AutoAdvisor AI MVP v28", page_icon="🚗", layout="wide")
 
 
 @st.cache_data
@@ -411,7 +411,19 @@ def extract_listing_text_from_url(url):
         "oag", "ad", "gts", "saleld", "viewtype", "showcase", "rankingtype",
     ]
 
-    words = [word for word in slug_text.split() if word.lower() not in noise_words]
+    words = []
+    for word in slug_text.split():
+        lower_word = word.lower()
+
+        if lower_word in noise_words:
+            continue
+
+        # Remove long ad/listing IDs from Carsales URLs.
+        if word.isdigit() and len(word) >= 6:
+            continue
+
+        words.append(word)
+
     readable = " ".join(words).strip()
 
     title = readable.title() if readable else f"{platform} listing"
@@ -468,7 +480,7 @@ def fetch_listing_page_text(url):
         # Instead of failing completely, extract make/model/year hints from the URL slug.
         fallback = extract_listing_text_from_url(url)
         fallback["description"] = (
-            f"Could not read the listing page automatically ({exc}). "
+            "Could not read the listing page automatically because the marketplace blocked automated access. "
             "Using details found in the URL only. Please enter price, kilometres and missing details manually."
         )
         return fallback
@@ -558,7 +570,7 @@ def apply_extracted_listing_to_session(extracted, base_df):
         st.session_state["listing_kms"] = extracted["kilometres"]
         extracted_messages.append(f"Kilometres: {extracted['kilometres']:,} km")
 
-    if extracted["service_history"] != "Unknown":
+    if extracted["service_history"] not in [None, "Unknown"]:
         st.session_state["listing_service"] = extracted["service_history"]
         extracted_messages.append(f"Service history: {extracted['service_history']}")
 
@@ -598,6 +610,74 @@ def render_imported_listing_preview(import_result, url):
 
         if url:
             st.link_button("Open original listing", url, use_container_width=True)
+
+
+
+def render_blocked_listing_quick_fill():
+    st.markdown("### Carsales blocked full import - quick fill missing details")
+    st.caption(
+        "Carsales hides the live price/kilometres from automated reading. Enter the visible values from the listing here, "
+        "then the analyser will use them. Annoying, but still better than pretending the price is magic."
+    )
+
+    q1, q2, q3 = st.columns(3)
+
+    with q1:
+        quick_price = st.number_input(
+            "Visible asking price (AUD)",
+            min_value=1000,
+            max_value=300000,
+            value=int(st.session_state.get("listing_price_quick", 26990)),
+            step=500,
+            key="listing_price_quick",
+        )
+
+    with q2:
+        quick_kms = st.number_input(
+            "Visible odometer / kilometres",
+            min_value=0,
+            max_value=500000,
+            value=int(st.session_state.get("listing_kms_quick", 53282)),
+            step=1000,
+            key="listing_kms_quick",
+        )
+
+    with q3:
+        quick_seller_type = st.selectbox(
+            "Seller type from listing",
+            ["Dealer", "Private"],
+            index=0,
+            key="listing_seller_quick",
+        )
+
+    q4, q5 = st.columns(2)
+
+    with q4:
+        quick_service = st.selectbox(
+            "Service history",
+            ["Unknown", "Full", "Partial", "No / missing"],
+            index=0,
+            key="listing_service_quick",
+        )
+
+    with q5:
+        quick_accident = st.selectbox(
+            "Accident/write-off concern",
+            ["Unknown", "No concern reported", "Known accident/write-off concern"],
+            index=0,
+            key="listing_accident_quick",
+        )
+
+    if st.button("Use these visible listing details", key="apply_blocked_listing_details"):
+        st.session_state["listing_price"] = quick_price
+        st.session_state["listing_kms"] = quick_kms
+        st.session_state["listing_seller_type"] = quick_seller_type
+        st.session_state["listing_service"] = quick_service
+        st.session_state["listing_accident"] = quick_accident
+        st.success(
+            f"Applied visible listing details: {money(quick_price)}, {quick_kms:,} km, {quick_seller_type}."
+        )
+
 
 
 
@@ -782,9 +862,6 @@ def city_to_slug(city):
 
 
 def build_listing_links(make, model, year_range=None, max_price=None, state=None, city=None, selected_year=None):
-    query = build_search_query(make, model, year_range, max_price, state, city, selected_year)
-    encoded_query = quote_plus(query)
-
     make_slug = slugify_for_url(make)
     model_slug = slugify_for_url(model)
     city_slug = city_to_slug(city or state_to_default_city(state))
@@ -798,26 +875,42 @@ def build_listing_links(make, model, year_range=None, max_price=None, state=None
             carsales_url = f"https://www.carsales.com.au/cars/{selected_year}/{make_slug}/{model_slug}/{state_slug}/"
         else:
             carsales_url = f"https://www.carsales.com.au/cars/{selected_year}/{make_slug}/{model_slug}/"
+
+        broad_query = f"{selected_year} {make} {model}"
     else:
         if state_slug:
             carsales_url = f"https://www.carsales.com.au/cars/{make_slug}/{model_slug}/{state_slug}/"
         else:
             carsales_url = f"https://www.carsales.com.au/cars/{make_slug}/{model_slug}/"
 
-    # Gumtree and Facebook use keyword search, so the selected year is included in the query.
-    gumtree_url = f"https://www.gumtree.com.au/s-cars-vans-utes/k0c18320?keywords={encoded_query}"
-    facebook_url = f"https://www.facebook.com/marketplace/search/?query={encoded_query}"
+        broad_query = f"{make} {model}"
 
-    # Cars24 does not have a consistently portable year URL. Use a keyword search-style URL with year in the query.
-    # If Cars24 ignores the query, the fallback is still its inventory search page. Humanity trembles.
-    cars24_url = f"https://www.cars24.com.au/buy-used-cars/?search={encoded_query}"
+    encoded_broad_query = quote_plus(broad_query)
+
+    # Gumtree treats the entire query as keywords, so adding "under 22000 Sydney" can create zero results.
+    # Keep Gumtree broad, then the user can filter price/location on Gumtree.
+    gumtree_url = f"https://www.gumtree.com.au/s-cars-vans-utes/k0c18320?keywords={encoded_broad_query}"
+
+    # Facebook Marketplace also behaves better with simple make/model/year terms.
+    facebook_url = f"https://www.facebook.com/marketplace/search/?query={encoded_broad_query}"
+
+    # Cars24's internal search query URLs are unreliable. Use Google site-search instead.
+    # Include city and price here because Google handles natural language search better than marketplace keyword boxes.
+    google_terms = broad_query
+    if city:
+        google_terms += f" {city}"
+    if max_price:
+        google_terms += f" under {int(max_price)}"
+    cars24_google_query = quote_plus(f"site:cars24.com.au/buy-used-cars {google_terms}")
+    cars24_url = f"https://www.google.com/search?q={cars24_google_query}"
 
     return {
         "Carsales": carsales_url,
-        "Gumtree": gumtree_url,
+        "Gumtree broad search": gumtree_url,
         "Facebook Marketplace": facebook_url,
-        "Cars24": cars24_url,
+        "Cars24 via Google": cars24_url,
     }
+
 
 
 def render_listing_search_buttons(make, model, year_range=None, max_price=None, state=None, city=None, key_suffix=None):
@@ -833,7 +926,7 @@ def render_listing_search_buttons(make, model, year_range=None, max_price=None, 
     safe_key = re.sub(r"[^A-Za-z0-9_]+", "_", str(key_suffix))
 
     if years:
-        st.caption("Choose one or more years to search")
+        st.caption("Choose one or more years to search. Marketplace buttons use broad searches first; apply price/location filters on the site if needed.")
 
         all_years = st.checkbox(
             "All years in this range",
@@ -3229,7 +3322,7 @@ with tab1:
         key_suffix="best_match",
     )
     st.caption(
-        "Choose one or more years, then open the marketplace links. Carsales uses year/make/model URLs. Gumtree, Facebook, and Cars24 include the selected year in the search query where possible."
+        "Choose one or more years, then open the marketplace links. Carsales uses year/make/model URLs. Gumtree and Facebook use broad make/model/year searches so they do not return zero results from over-specific keywords. Apply price/location filters on the marketplace page. Cars24 opens through Google site-search because Cars24's own search URL is unreliable."
     )
 
     with st.expander("Search links for top 5 recommendations"):
@@ -3303,22 +3396,24 @@ with tab2:
                     st.session_state["last_listing_import"] = import_result
 
                 if import_result.get("ok"):
-                    render_imported_listing_preview(import_result, listing_url_input)
                     extracted = extract_listing_details(import_result.get("combined_text", ""), df)
                     extracted_messages = apply_extracted_listing_to_session(extracted, df)
 
                     if import_result.get("fallback_from_url"):
+                        st.session_state["blocked_listing_import"] = True
                         st.warning(
                             "Carsales blocked automatic page reading, so I extracted only what I could from the URL. "
                             "Enter the actual price, kilometres and service details manually before analysing."
                         )
+                    else:
+                        st.session_state["blocked_listing_import"] = False
 
                     if extracted_messages:
                         st.success("Imported: " + ", ".join(extracted_messages))
                         if extracted.get("price") is None:
-                            st.warning("Price was not clearly found from the link, so the app will use the dataset estimate/default. Please enter the actual asking price manually.")
+                            st.warning("Price was not found from the link. Enter the actual asking price manually before analysing.")
                         if extracted.get("accident_status") in [None, "Unknown"]:
-                            st.info("Accident/write-off status was not clearly found. It stays as Unknown until the seller/PPSR confirms it.")
+                            st.info("Accident/write-off status was not found. It stays as Unknown until the seller/PPSR confirms it.")
                         st.info("The fields below have been updated. Review them before analysing.")
                     else:
                         st.warning("I could not confidently extract car details. Copy the listing title/description and use Paste listing text.")
@@ -3333,6 +3428,9 @@ with tab2:
                 st.session_state["last_listing_import"],
                 st.session_state["listing_original_url"],
             )
+
+        if st.session_state.get("blocked_listing_import"):
+            render_blocked_listing_quick_fill()
 
     with st.expander("Paste raw listing text and auto-fill fields", expanded=(import_mode == "Paste listing text")):
         raw_listing_text = st.text_area(
